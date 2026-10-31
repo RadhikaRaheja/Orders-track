@@ -1,0 +1,15 @@
+{
+  "name": "Track Your Order - CPN",
+  "short_name": "Track Order",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ff69b4",
+  "icons": [
+    {
+      "src": "cpn.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
