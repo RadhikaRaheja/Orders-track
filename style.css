@@ -406,7 +406,7 @@ tbody tr:hover {
   font-weight: 600;
 }
 
-/* Popup Modal & Visual Timeline */
+/* Popup Modal & Embedded Live Tracking Frame */
 .popup-overlay {
   display: none;
   position: fixed;
@@ -424,7 +424,9 @@ tbody tr:hover {
   padding: 26px 24px;
   border-radius: 18px;
   width: 100%;
-  max-width: 440px;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
   animation: modalFadeIn 0.2s ease-out;
 }
@@ -460,7 +462,7 @@ tbody tr:hover {
 .timeline-steps {
   display: flex;
   justify-content: space-between;
-  margin: 16px 0 22px;
+  margin: 16px 0 20px;
   position: relative;
 }
 
@@ -524,7 +526,7 @@ tbody tr:hover {
 .modal-actions {
   display: flex;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 16px;
 }
 
 .modal-actions button,
@@ -606,7 +608,7 @@ tbody tr:hover {
   bottom: 45px;
 }
 
-/* MOBILE CARD LAYOUT (Transforms Table Rows into Cards on Phone Screens) */
+/* MOBILE CARD LAYOUT */
 @media screen and (max-width: 768px) {
   .main-wrapper {
     padding: 18px 14px;
