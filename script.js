@@ -1,10 +1,10 @@
-// Cute Printed Nightwears by Radhika - Official Tracking Script v2.0
+// Cute Printed Nightwears by Radhika - Official Tracking Script v3.0
 const SHEET_ID = '1UMul8nt25GR8MUM-_EdwAR0q6Ne2ovPv_R-m1-CHeXw';
 
 const SALES_SHEET_NAME = 'Daily Sales record';
 const COURIER_SHEET_NAME = 'CourierMapping';
-const CACHE_KEY = 'cpn_tracking_cache_v3';
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache for instant reloads (<0.5s)
+const CACHE_KEY = 'cpn_tracking_cache_v4';
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache for instant reloads
 
 let data = [];
 let filteredData = [];
@@ -14,18 +14,16 @@ let currentPage = 1;
 const entriesPerPage = 10;
 let debounceTimer = null;
 
-// ========== SMART INDIAN DATE PARSER (Handles DD/MM/YY, DD/MM/YYYY, 1-Dec-2023) ==========
+// ========== SMART INDIAN DATE PARSER ==========
 function parseSheetDate(rawDate) {
   if (!rawDate) return null;
   const str = String(rawDate).trim();
 
-  // 1. Handle Google gviz Date(YYYY, M, D) format if returned
   const gvizMatch = str.match(/^Date\((\d+),(\d+),(\d+)\)$/);
   if (gvizMatch) {
     return new Date(Number(gvizMatch[1]), Number(gvizMatch[2]), Number(gvizMatch[3]));
   }
 
-  // 2. Handle DD/MM/YY or DD/MM/YYYY or DD.MM.YYYY
   const dmySlash = str.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})$/);
   if (dmySlash) {
     const day = parseInt(dmySlash[1], 10);
@@ -36,7 +34,6 @@ function parseSheetDate(rawDate) {
     return isNaN(d.getTime()) ? null : d;
   }
 
-  // 3. Handle standard date strings like "1-Dec-2023" or "2026-10-28"
   const parsed = new Date(str);
   return isNaN(parsed.getTime()) ? null : parsed;
 }
@@ -57,7 +54,7 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// ========== DIRECT GOOGLE GVIZ FETCHER (Only Fetches Public Columns A,B,D,I,J,K,L) ==========
+// ========== DIRECT GOOGLE GVIZ FETCHER (Strips Private Financial Columns) ==========
 function fetchGoogleSheetGviz(sheetName, selectQuery) {
   return new Promise((resolve, reject) => {
     const callbackName = 'cpnGvizCb_' + Math.random().toString(36).substring(2, 10);
@@ -124,8 +121,7 @@ async function initApp(forceRefresh = false) {
   if (tableContainer) tableContainer.style.display = 'none';
 
   try {
-    // Fetch ONLY public columns from Daily Sales record:
-    // A: Date, B: Customer Name, D: Location (Pincode), I: Courier Name, J: Tracking ID, K: Category, L: Tracking Link
+    // Only fetches public columns: A (Date), B (Customer Name), D (Pincode), I (Courier), J (Tracking ID), K (Category), L (Tracking Link)
     const [salesTable, courierTable] = await Promise.all([
       fetchGoogleSheetGviz(SALES_SHEET_NAME, 'SELECT A, B, D, I, J, K, L WHERE B IS NOT NULL'),
       fetchGoogleSheetGviz(COURIER_SHEET_NAME, 'SELECT A, B, C WHERE A IS NOT NULL')
@@ -139,7 +135,6 @@ async function initApp(forceRefresh = false) {
     const recentSales = [];
     let consecutiveOldRows = 0;
 
-    // Scan from the BOTTOM of the sheet upward (Newest orders first)
     for (let i = rows.length - 1; i >= 0; i--) {
       const r = rows[i];
       const rawDate = getCellValue(r, 0);
@@ -164,9 +159,7 @@ async function initApp(forceRefresh = false) {
         });
       } else {
         consecutiveOldRows++;
-        if (consecutiveOldRows > 80 && recentSales.length > 0) {
-          break;
-        }
+        if (consecutiveOldRows > 80 && recentSales.length > 0) break;
       }
     }
 
@@ -382,13 +375,13 @@ function renderResults() {
 
     let statusActionHtml = `<button class="track-action-btn" onclick="event.stopPropagation(); showPopupByIndex(${filteredData.indexOf(row)})">Details</button>`;
     if (slug && trackingId.length > 4) {
-      statusActionHtml = `<button class="track-action-btn" onclick="event.stopPropagation(); openAfterShipMiniTab('${escapeHtml(slug)}', '${escapeHtml(trackingId)}')">
+      statusActionHtml = `<button class="track-action-btn" onclick="event.stopPropagation(); showPopupByIndex(${filteredData.indexOf(row)})">
         <i class="fa-solid fa-location-crosshairs"></i> Track Live
       </button>`;
     } else if (directTrackingLink.startsWith('http')) {
-      statusActionHtml = `<a href="${escapeHtml(directTrackingLink)}" target="_blank" rel="noopener" class="track-action-btn" onclick="event.stopPropagation()">
-        <i class="fa-solid fa-arrow-up-right-from-square"></i> Track Link
-      </a>`;
+      statusActionHtml = `<button class="track-action-btn" onclick="event.stopPropagation(); showPopupByIndex(${filteredData.indexOf(row)})">
+        <i class="fa-solid fa-location-crosshairs"></i> Track Live
+      </button>`;
     }
 
     tr.innerHTML = `
@@ -401,7 +394,7 @@ function renderResults() {
       <td data-label="Action">${statusActionHtml}</td>
     `;
 
-    tr.onclick = () => showPopup(row, trackingId, slug);
+    tr.onclick = () => showPopupByIndex(filteredData.indexOf(row));
     tableBody.appendChild(tr);
   });
 
@@ -416,31 +409,27 @@ function showPopupByIndex(idx) {
   showPopup(row, trackingId, courierSlugMap[courierKey] || '');
 }
 
-// ========== MODAL POPUP & WHATSAPP RECEIPT SHARE ==========
+// ========== MODAL POPUP WITH EMBEDDED FREE LIVE TRACKING ==========
 function showPopup(row, trackingId, slug) {
   const formattedDate = row.Date;
   const customerName = row['Customer Name'] || 'Valued Customer';
   const pincode = row['Location (Pincode)'] || 'N/A';
   const courierName = row['Courier Name'] || 'Standard Dispatch';
-  const courierUrl = (row['Tracking Link'] || '').startsWith('http')
-    ? row['Tracking Link']
-    : (couriers[courierName] || '');
+  const directLink = (row['Tracking Link'] || '').trim();
   const category = row['Category'] || 'Nightwear';
   const cleanTid = (trackingId || 'N/A').toUpperCase();
 
-  let trackBtnHtml = '';
-  if (slug && trackingId.length > 4) {
-    trackBtnHtml = `<button class="btn-primary-track" onclick="openAfterShipMiniTab('${escapeHtml(slug)}', '${escapeHtml(trackingId)}')">
-      <i class="fa-solid fa-location-dot"></i> Live Status
-    </button>`;
-  } else if (courierUrl && courierUrl !== '#') {
-    trackBtnHtml = `<a href="${escapeHtml(courierUrl)}" target="_blank" rel="noopener" class="btn-primary-track">
-      <i class="fa-solid fa-arrow-up-right-from-square"></i> Courier Site
-    </a>`;
+  let freeTrackingUrl = '';
+  if (directLink.startsWith('http')) {
+    freeTrackingUrl = directLink;
+  } else if (slug && trackingId.length > 4) {
+    freeTrackingUrl = `https://www.aftership.com/track/${slug}/${trackingId}`;
+  } else {
+    freeTrackingUrl = `https://www.google.com/search?q=${encodeURIComponent(courierName + ' tracking ' + trackingId)}`;
   }
 
   const content = `
-    <h3 class="modal-title">📦 Order Dispatch Summary</h3>
+    <h3 class="modal-title">📦 Order Dispatch & Live Status</h3>
 
     <div class="timeline-steps">
       <div class="step">
@@ -471,14 +460,10 @@ function showPopup(row, trackingId, slug) {
         <strong>📍 ${escapeHtml(pincode)}</strong>
       </div>
       <div class="detail-item">
-        <span>Category</span>
-        <strong>${escapeHtml(category)}</strong>
-      </div>
-      <div class="detail-item">
         <span>Courier Partner</span>
         <strong>${escapeHtml(courierName)}</strong>
       </div>
-      <div class="detail-item">
+      <div class="detail-item" style="grid-column: span 2;">
         <span>Tracking Number</span>
         <strong>
           <span id="copyTarget">${escapeHtml(cleanTid)}</span>
@@ -489,8 +474,18 @@ function showPopup(row, trackingId, slug) {
       </div>
     </div>
 
-    <div class="modal-actions">
-      ${trackBtnHtml}
+    <!-- Free Embedded Live Tracking Frame -->
+    <div style="margin-top: 14px;">
+      <p style="font-size: 12px; font-weight: 600; color: #6b7280; margin: 0 0 6px;">Live Status Preview:</p>
+      <div style="width: 100%; height: 210px; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; background: #f9fafb;">
+        <iframe src="${escapeHtml(freeTrackingUrl)}" style="width: 100%; height: 100%; border: none;" title="Live Tracking"></iframe>
+      </div>
+    </div>
+
+    <div class="modal-actions" style="margin-top: 14px;">
+      <a href="${escapeHtml(freeTrackingUrl)}" target="_blank" rel="noopener" class="btn-primary-track">
+        <i class="fa-solid fa-expand"></i> Full Screen
+      </a>
       <button class="btn-whatsapp-share" onclick="shareReceiptMessage({
         date: '${escapeHtml(formattedDate)}',
         name: '${escapeHtml(customerName)}',
@@ -538,15 +533,6 @@ function hidePopup() {
 
 function handleOverlayClick(e) {
   if (e.target.id === 'popupOverlay') hidePopup();
-}
-
-function openAfterShipMiniTab(slug, trackingId) {
-  if (!slug || !trackingId) {
-    showToast('⚠️ No courier or tracking ID mapped.');
-    return;
-  }
-  const url = `https://www.aftership.com/track/${slug}/${trackingId}`;
-  window.open(url, 'AfterShipStatus', 'width=640,height=680,resizable=yes,scrollbars=yes');
 }
 
 // ========== PAGINATION ==========
