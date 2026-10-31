@@ -1,10 +1,10 @@
-// Cute Printed Nightwears by Radhika - Official Tracking Script v3.0
+// Cute Printed Nightwears by Radhika - Official Tracking Script v3.1
 const SHEET_ID = '1UMul8nt25GR8MUM-_EdwAR0q6Ne2ovPv_R-m1-CHeXw';
 
 const SALES_SHEET_NAME = 'Daily Sales record';
 const COURIER_SHEET_NAME = 'CourierMapping';
-const CACHE_KEY = 'cpn_tracking_cache_v4';
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache for instant reloads
+const CACHE_KEY = 'cpn_tracking_cache_v5';
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 let data = [];
 let filteredData = [];
@@ -54,7 +54,7 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// ========== DIRECT GOOGLE GVIZ FETCHER (Strips Private Financial Columns) ==========
+// ========== DIRECT GOOGLE GVIZ FETCHER ==========
 function fetchGoogleSheetGviz(sheetName, selectQuery) {
   return new Promise((resolve, reject) => {
     const callbackName = 'cpnGvizCb_' + Math.random().toString(36).substring(2, 10);
@@ -97,7 +97,7 @@ function getCellValue(row, colIndex) {
   return '';
 }
 
-// ========== FAST PARALLEL DATA LOADING + BOTTOM-UP 90-DAY FILTER ==========
+// ========== FAST DATA LOADING ==========
 async function initApp(forceRefresh = false) {
   const loadingEl = document.getElementById('loadingState');
   const tableContainer = document.getElementById('tableContainer');
@@ -121,7 +121,6 @@ async function initApp(forceRefresh = false) {
   if (tableContainer) tableContainer.style.display = 'none';
 
   try {
-    // Only fetches public columns: A (Date), B (Customer Name), D (Pincode), I (Courier), J (Tracking ID), K (Category), L (Tracking Link)
     const [salesTable, courierTable] = await Promise.all([
       fetchGoogleSheetGviz(SALES_SHEET_NAME, 'SELECT A, B, D, I, J, K, L WHERE B IS NOT NULL'),
       fetchGoogleSheetGviz(COURIER_SHEET_NAME, 'SELECT A, B, C WHERE A IS NOT NULL')
@@ -346,10 +345,7 @@ function renderResults() {
   pageItems.forEach((row) => {
     const tr = document.createElement('tr');
     const courierNameOrig = (row['Courier Name'] || '').trim();
-    const courierKey = courierNameOrig.toLowerCase();
     const trackingId = (row['Tracking ID'] || '').trim();
-    const directTrackingLink = (row['Tracking Link'] || '').trim();
-    const slug = courierSlugMap[courierKey] || '';
 
     let courierHtml = `<span style="color:#9ca3af;">N/A</span>`;
     if (courierNameOrig) {
@@ -373,16 +369,9 @@ function renderResults() {
       </span>`;
     }
 
-    let statusActionHtml = `<button class="track-action-btn" onclick="event.stopPropagation(); showPopupByIndex(${filteredData.indexOf(row)})">Details</button>`;
-    if (slug && trackingId.length > 4) {
-      statusActionHtml = `<button class="track-action-btn" onclick="event.stopPropagation(); showPopupByIndex(${filteredData.indexOf(row)})">
-        <i class="fa-solid fa-location-crosshairs"></i> Track Live
-      </button>`;
-    } else if (directTrackingLink.startsWith('http')) {
-      statusActionHtml = `<button class="track-action-btn" onclick="event.stopPropagation(); showPopupByIndex(${filteredData.indexOf(row)})">
-        <i class="fa-solid fa-location-crosshairs"></i> Track Live
-      </button>`;
-    }
+    const statusActionHtml = `<button class="track-action-btn" onclick="event.stopPropagation(); showPopupByIndex(${filteredData.indexOf(row)})">
+      <i class="fa-solid fa-location-crosshairs"></i> Track
+    </button>`;
 
     tr.innerHTML = `
       <td data-label="Dispatch Date">${escapeHtml(row.Date)}</td>
@@ -409,7 +398,7 @@ function showPopupByIndex(idx) {
   showPopup(row, trackingId, courierSlugMap[courierKey] || '');
 }
 
-// ========== MODAL POPUP WITH EMBEDDED FREE LIVE TRACKING ==========
+// ========== CLEAN POPUP WITH DIRECT COURIER TRACKING & WHATSAPP SHARE ==========
 function showPopup(row, trackingId, slug) {
   const formattedDate = row.Date;
   const customerName = row['Customer Name'] || 'Valued Customer';
@@ -419,17 +408,20 @@ function showPopup(row, trackingId, slug) {
   const category = row['Category'] || 'Nightwear';
   const cleanTid = (trackingId || 'N/A').toUpperCase();
 
-  let freeTrackingUrl = '';
+  // Establish direct courier tracking URL
+  let trackingUrl = '#';
   if (directLink.startsWith('http')) {
-    freeTrackingUrl = directLink;
+    trackingUrl = directLink;
   } else if (slug && trackingId.length > 4) {
-    freeTrackingUrl = `https://www.aftership.com/track/${slug}/${trackingId}`;
+    trackingUrl = `https://www.aftership.com/track/${slug}/${trackingId}`;
+  } else if (couriers[courierName] && couriers[courierName] !== '#') {
+    trackingUrl = couriers[courierName];
   } else {
-    freeTrackingUrl = `https://www.google.com/search?q=${encodeURIComponent(courierName + ' tracking ' + trackingId)}`;
+    trackingUrl = `https://www.google.com/search?q=${encodeURIComponent(courierName + ' tracking ' + trackingId)}`;
   }
 
   const content = `
-    <h3 class="modal-title">📦 Order Dispatch & Live Status</h3>
+    <h3 class="modal-title">📦 Order Dispatch Summary</h3>
 
     <div class="timeline-steps">
       <div class="step">
@@ -460,10 +452,14 @@ function showPopup(row, trackingId, slug) {
         <strong>📍 ${escapeHtml(pincode)}</strong>
       </div>
       <div class="detail-item">
+        <span>Category</span>
+        <strong>${escapeHtml(category)}</strong>
+      </div>
+      <div class="detail-item">
         <span>Courier Partner</span>
         <strong>${escapeHtml(courierName)}</strong>
       </div>
-      <div class="detail-item" style="grid-column: span 2;">
+      <div class="detail-item">
         <span>Tracking Number</span>
         <strong>
           <span id="copyTarget">${escapeHtml(cleanTid)}</span>
@@ -474,17 +470,9 @@ function showPopup(row, trackingId, slug) {
       </div>
     </div>
 
-    <!-- Free Embedded Live Tracking Frame -->
-    <div style="margin-top: 14px;">
-      <p style="font-size: 12px; font-weight: 600; color: #6b7280; margin: 0 0 6px;">Live Status Preview:</p>
-      <div style="width: 100%; height: 210px; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; background: #f9fafb;">
-        <iframe src="${escapeHtml(freeTrackingUrl)}" style="width: 100%; height: 100%; border: none;" title="Live Tracking"></iframe>
-      </div>
-    </div>
-
-    <div class="modal-actions" style="margin-top: 14px;">
-      <a href="${escapeHtml(freeTrackingUrl)}" target="_blank" rel="noopener" class="btn-primary-track">
-        <i class="fa-solid fa-expand"></i> Full Screen
+    <div class="modal-actions" style="margin-top: 18px;">
+      <a href="${escapeHtml(trackingUrl)}" target="_blank" rel="noopener" class="btn-primary-track" style="background:#ff4d94; color:#white; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:6px;">
+        <i class="fa-solid fa-location-dot"></i> Live Status (${escapeHtml(courierName)})
       </a>
       <button class="btn-whatsapp-share" onclick="shareReceiptMessage({
         date: '${escapeHtml(formattedDate)}',
