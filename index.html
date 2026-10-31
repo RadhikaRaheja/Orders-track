@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track Your Order | Cute Printed Nightwears by Radhika</title>
+  <link rel="icon" type="image/png" href="cpn.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#ff4d94" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+</head>
+<body>
+  <div class="main-wrapper">
+    <!-- Brand Header -->
+    <header class="brand-header">
+      <img src="cpn.png" alt="Cute Printed Nightwears Logo" class="logo" onerror="this.src='https://github.com/RadhikaRaheja/CutePrintedNightwearsbyRadhika-track/blob/main/cpn.png?raw=true'">
+      <span class="brand-badge">✨ Official Dispatch Portal</span>
+      <h1>Track Your Order</h1>
+      <p class="subtitle">Search by your Name, Pincode, or Tracking ID to view live dispatch details</p>
+    </header>
+
+    <!-- Search & Filter Card -->
+    <section class="search-card">
+      <div class="search-bar">
+        <div class="select-wrapper">
+          <select id="searchField" onchange="handleSearchFieldChange()" aria-label="Search Filter">
+            <option value="ALL">🔍 All Fields (Smart Search)</option>
+            <option value="Customer Name">👤 Customer Name</option>
+            <option value="Location (Pincode)">📍 Pincode</option>
+            <option value="Tracking ID">🔢 Tracking ID</option>
+            <option value="Date">📅 Dispatch Date</option>
+            <option value="Courier Name">🚚 Courier Partner</option>
+          </select>
+        </div>
+
+        <div class="input-wrapper" id="textInputWrapper">
+          <i class="fa-solid fa-magnifying-glass search-icon"></i>
+          <input type="text" id="searchInput" placeholder="Enter Name, Pincode, or Tracking ID..." oninput="debouncedFilter()" />
+          <button class="clear-input-btn" id="clearInputBtn" onclick="resetSearch()" title="Clear search" style="display:none;">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <input type="date" id="dateInput" style="display:none" onchange="filterResults()" />
+        <select id="courierDropdown" style="display:none" onchange="filterResults()">
+          <option value="">All Couriers</option>
+        </select>
+
+        <button class="search-btn" onclick="filterResults()">
+          <i class="fa-solid fa-paper-plane"></i> Track
+        </button>
+      </div>
+    </section>
+
+    <!-- Status Bar -->
+    <div class="toolbar">
+      <p id="resultsCount">⏳ Loading recent dispatches...</p>
+      <button class="refresh-btn" onclick="refreshData(true)" title="Fetch latest sheet updates">
+        <i class="fa-solid fa-arrows-rotate"></i> Refresh
+      </button>
+    </div>
+
+    <!-- Skeleton Loading State -->
+    <div id="loadingState" class="loading-container">
+      <div class="spinner"></div>
+      <p>Fetching latest dispatch records...</p>
+    </div>
+
+    <!-- Results Table / Mobile Cards -->
+    <div class="table-wrapper" id="tableContainer" style="display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th>Dispatch Date</th>
+            <th>Customer</th>
+            <th>Pincode</th>
+            <th>Courier</th>
+            <th>Tracking ID</th>
+            <th>Category</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="resultsTable"></tbody>
+      </table>
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="empty-state" style="display:none;">
+      <i class="fa-solid fa-box-open"></i>
+      <h3>No matching orders found</h3>
+      <p>Try searching with just your first name, pincode, or check another date.</p>
+      <button class="reset-btn" onclick="resetSearch()">Show All Recent Orders</button>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="paginationControls" style="display:none;">
+      <button onclick="prevPage()" id="prevBtn" aria-label="Previous Page"><i class="fa-solid fa-chevron-left"></i></button>
+      <span class="page-info">
+        Page <input type="number" id="pageNumber" min="1" onchange="jumpToPage()" /> of <span id="totalPages">1</span>
+      </span>
+      <button onclick="nextPage()" id="nextBtn" aria-label="Next Page"><i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+
+    <!-- Order Details & Visual Timeline Modal -->
+    <div class="popup-overlay" id="popupOverlay" onclick="handleOverlayClick(event)">
+      <div class="popup">
+        <button class="modal-close-icon" onclick="hidePopup()" aria-label="Close modal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div id="popupContent"></div>
+      </div>
+    </div>
+
+    <footer id="copyright">
+      © Cute Printed Nightwears by Radhika ❤️
+    </footer>
+  </div>
+
+  <!-- Floating WhatsApp Help -->
+  <a href="https://wa.me/918307358952?text=Hi%20Team,%20I%20need%20help%20tracking%20my%20order." target="_blank" rel="noopener" class="floating-whatsapp" title="Chat with us on WhatsApp">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" />
+  </a>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">📋 Copied to clipboard!</div>
+
+  <script src="script.js"></script>
+</body>
+</html>
